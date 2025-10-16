@@ -33,7 +33,8 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	// Validate required fields
-	if user.Username == "" || user.Password == "" || user.ConfirmPassword == "" || user.PhoneNumber == "" {
+	// if user.Username == "" || user.Password == "" || user.ConfirmPassword == "" || user.PhoneNumber == "" {
+	if user.Username == "" || user.Password == "" || user.PhoneNumber == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "All fields are required",
 		})
