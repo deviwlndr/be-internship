@@ -3,7 +3,6 @@ package controller
 import (
 	"be-internship/config"
 	"be-internship/model"
-
 	// "be-internship/model"
 	"context"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
+
 )
 
 // REGISTER
