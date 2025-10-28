@@ -34,4 +34,5 @@ func main() {
 	// Start the server
 	log.Printf("🚀 Server is running on http://localhost:%s", port)
 	log.Fatal(app.Listen(":" + port))
+	
 }
