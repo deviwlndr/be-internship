@@ -182,3 +182,5 @@ func JWTAuth(c *fiber.Ctx) error {
 		"message": "Unauthorized",
 	}) // Jika tidak valid
 }
+
+
