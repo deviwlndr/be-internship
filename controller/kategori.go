@@ -18,6 +18,7 @@ func InsertCategory(db *mongo.Database, col string, kategori model.Kategori) (pr
 	// Membuat dokumen BSON untuk disimpan ke MongoDB
 	categoryData := bson.M{
 		"nama_kategori": kategori.NamaKategori,
+		"deskripsi":     kategori.Deskripsi,
 	}
 
 	// Menyisipkan dokumen ke koleksi
