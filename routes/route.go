@@ -20,7 +20,10 @@ func SetupRoutes(app *fiber.App) {
 	// Koleksi routes
 	koleksiRoutes := api.Group("/koleksi")     
 	// Insert                                                                                                                                            
-	koleksiRoutes.Post("/", controller.JWTAuth, controller.InsertKoleksi) // Insert koleksi
+
+	koleksiRoutes.Post("/", controller.InsertKoleksi)
+	
+
 
 	// Tambahkan kategori route
 	KategoriRoutes(api)
