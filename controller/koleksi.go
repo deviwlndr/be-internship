@@ -19,7 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
- 
+
 // Fungsi utama untuk insert koleksi (pakai form-data)
 func InsertKoleksi(c *fiber.Ctx) error {
 	noReg := c.FormValue("no_reg")
@@ -164,3 +164,217 @@ func uploadImageToGitHub(file *multipart.FileHeader, namaBenda string) (string, 
 
 	return content["download_url"].(string), nil
 }
+
+func GetAllKoleksi(c *fiber.Ctx) error {
+	db := config.Ulbimongoconn
+	col := db.Collection("koleksi") // nama koleksi MongoDB
+
+	filter := bson.M{}
+	cursor, err := col.Find(context.TODO(), filter)
+	if err != nil {
+		fmt.Println("Error GetAllKoleksi:", err)
+		return c.Status(500).JSON(fiber.Map{
+			"message": "Gagal mengambil data koleksi",
+			"error":   err.Error(),
+		})
+	}
+
+	var koleksi []model.Koleksi
+	err = cursor.All(context.TODO(), &koleksi)
+	if err != nil {
+		fmt.Println("Error decode:", err)
+		return c.Status(500).JSON(fiber.Map{
+			"message": "Gagal decode data koleksi",
+			"error":   err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message":  "Berhasil mengambil semua data koleksi",
+		"data":     koleksi,
+	})
+}
+
+func GetKoleksiByID(c *fiber.Ctx) error {
+	// Ambil parameter ID dari URL
+	idParam := c.Params("id")
+
+	// Konversi ID string menjadi ObjectID MongoDB
+	objectID, err := primitive.ObjectIDFromHex(idParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID koleksi tidak valid",
+		})
+	}
+
+	// Ambil koleksi koleksi
+	collection := config.Ulbimongoconn.Collection("koleksi")
+
+	// Query ke database
+	var koleksi model.Koleksi
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&koleksi)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Koleksi tidak ditemukan",
+		})
+	}
+
+	// Return hasil
+	return c.JSON(fiber.Map{
+		"message":  "Berhasil mengambil data koleksi",
+		"data":     koleksi,
+	})
+}
+
+//update koleksi
+func UpdateKoleksi(c *fiber.Ctx) error {
+	id := c.Params("id") // ambil ID koleksi dari parameter URL
+
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID koleksi tidak valid.",
+		})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := config.Ulbimongoconn.Collection("koleksi")
+
+	// 🔹 Cari data lama dulu
+	var existing model.Koleksi
+	err = collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&existing)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Koleksi tidak ditemukan.",
+		})
+	}
+
+	// 🔹 Ambil data baru dari form
+	noReg := c.FormValue("no_reg")
+	noInv := c.FormValue("no_inv")
+	namaBenda := c.FormValue("nama_benda")
+	kategoriID := c.FormValue("kategori_id")
+	bahan := c.FormValue("bahan")
+	ukuran := c.FormValue("ukuran")
+	tahunPerolehan := c.FormValue("tahun_perolehan")
+	asalPerolehan := c.FormValue("asal_perolehan")
+	ket := c.FormValue("ket")
+	tempat := c.FormValue("tempat_penyimpanan")
+
+	// 🔹 Validasi kategori baru (kalau diisi)
+	var kategori model.Kategori
+	if kategoriID != "" {
+		kategoriObjID, err := primitive.ObjectIDFromHex(kategoriID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "ID kategori tidak valid.",
+			})
+		}
+
+		kategoriCollection := config.Ulbimongoconn.Collection("kategori")
+		err = kategoriCollection.FindOne(ctx, bson.M{"_id": kategoriObjID}).Decode(&kategori)
+		if err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Kategori tidak ditemukan.",
+			})
+		}
+	} else {
+		kategori = existing.Kategori // tetap pakai kategori lama
+	}
+
+	// 🔹 Cek apakah ada file baru
+	file, err := c.FormFile("foto")
+	var imageURL string
+	if err == nil {
+		// Jika ada foto baru, upload ulang
+		imageURL, err = uploadImageToGitHub(file, namaBenda)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("Gagal upload gambar ke GitHub: %v", err),
+			})
+		}
+	} else {
+		imageURL = existing.Foto // pakai foto lama
+	}
+
+	// 🔹 Siapkan data update
+	updateData := bson.M{
+		"no_registrasi":      ifNotEmpty(noReg, existing.NoRegistrasi),
+		"no_inventaris":      ifNotEmpty(noInv, existing.NoInventaris),
+		"nama_benda":         ifNotEmpty(namaBenda, existing.NamaBenda),
+		"kategori":           kategori,
+		"bahan":              ifNotEmpty(bahan, existing.Bahan),
+		"ukuran":             ifNotEmpty(ukuran, existing.Ukuran),
+		"tahun_perolehan":    ifNotEmpty(tahunPerolehan, existing.TahunPerolehan),
+		"asal_perolehan":     ifNotEmpty(asalPerolehan, existing.AsalPerolehan),
+		"keterangan":         ifNotEmpty(ket, existing.Keterangan),
+		"tempat_penyimpanan": ifNotEmpty(tempat, existing.TempatPenyimpanan),
+		"foto":               imageURL,
+		"updated_at":         time.Now(),
+	}
+
+	// 🔹 Update ke MongoDB
+	_, err = collection.UpdateOne(ctx, bson.M{"_id": objID}, bson.M{"$set": updateData})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal memperbarui data: " + err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message":   "Koleksi berhasil diperbarui.",
+		"image_url": imageURL,
+	})
+}
+
+// Fungsi helper agar field kosong tidak menimpa data lama
+func ifNotEmpty(newValue, oldValue string) string {
+	if newValue != "" {
+		return newValue
+	}
+	return oldValue
+}
+
+
+func DeleteKoleksiByID(c *fiber.Ctx) error {
+	// Ambil ID dari parameter URL
+	idParam := c.Params("id")
+	id, err := primitive.ObjectIDFromHex(idParam)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID tidak valid",
+		})
+	}
+
+	// Koneksi ke database dan tentukan koleksi
+	db := config.Ulbimongoconn
+	col := db.Collection("koleksi")
+
+	// Filter berdasarkan ID
+	filter := bson.M{"_id": id}
+
+	// Hapus data
+	result, err := col.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fmt.Sprintf("Gagal menghapus data untuk ID %s: %s", idParam, err.Error()),
+		})
+	}
+
+	// Jika data tidak ditemukan
+	if result.DeletedCount == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": fmt.Sprintf("Data dengan ID %s tidak ditemukan", idParam),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": fmt.Sprintf("Koleksi dengan ID %s berhasil dihapus", idParam),
+	})
+}
+
