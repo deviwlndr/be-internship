@@ -4,7 +4,6 @@ import (
 	"be-internship/controller"
 
 	"github.com/gofiber/fiber/v2"
-
 )
 
 // SetupRoutes initializes all the application routes
@@ -22,6 +21,11 @@ func SetupRoutes(app *fiber.App) {
 	// Insert                                                                                                                                            
 
 	koleksiRoutes.Post("/", controller.InsertKoleksi)
+	koleksiRoutes.Get("/", controller.GetAllKoleksi)
+	koleksiRoutes.Get("/:id", controller.GetKoleksiByID)
+	koleksiRoutes.Put("/:id", controller.UpdateKoleksi)
+	koleksiRoutes.Delete("/:id", controller.DeleteKoleksiByID)
+
 	
 
 

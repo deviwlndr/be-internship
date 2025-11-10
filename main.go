@@ -17,7 +17,6 @@ func main() {
 	if port == "" {
 		port = "3000" // Default port jika PORT tidak diset
 	}
-
 	// Create a new Fiber app
 	app := fiber.New()
 
